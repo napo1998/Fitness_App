@@ -5,6 +5,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import os
 import numpy as np
+from data_cleaning import clean_dataframe, save_cleaned
 
 # Page configuration
 st.set_page_config(
@@ -35,6 +36,7 @@ st.markdown("""
 
 # Data file path
 DATA_FILE = 'fitness_competition_data.csv'
+CLEANED_FILE = 'fitness_competition_data_cleaned.csv'
 
 def initialize_data():
     """Initialize or load existing data"""
@@ -303,6 +305,22 @@ with st.sidebar:
     if st.button("🔄 Refresh Data", use_container_width=True):
         st.session_state.data = initialize_data()
         st.rerun()
+
+    if st.button("🧹 Clean Data", use_container_width=True):
+        try:
+            cleaned = clean_dataframe(st.session_state.data)
+            # Save cleaned to a separate file and update session data
+            saved = save_cleaned(cleaned, CLEANED_FILE)
+            st.session_state.data = cleaned
+            # Overwrite original persistent file as well
+            save_data(st.session_state.data)
+            if saved:
+                st.success(f"🧹 Data cleaned and saved to {CLEANED_FILE}")
+            else:
+                st.warning("🧹 Data cleaned in memory, but failed to save cleaned CSV file.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error cleaning data: {e}")
     
     if not st.session_state.data.empty:
         csv = st.session_state.data.to_csv(index=False)
