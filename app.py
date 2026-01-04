@@ -8,7 +8,7 @@ import numpy as np
 
 # Page configuration
 st.set_page_config(
-    page_title="Winter Arc Challenge",
+    page_title="Winter Arc Challenge 2025 by Arturo Boquin",
     page_icon="❄️",
     layout="wide"
 )
