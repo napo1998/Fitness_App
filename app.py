@@ -810,7 +810,86 @@ with tab5:
         df_display['Date'] = df_display['Date'].dt.strftime('%Y-%m-%d')
         
         st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
-        
+
+        # --- Edit existing entry UI ---
+        st.markdown("---")
+        st.subheader("✏️ Edit an Entry")
+
+        if not df_filtered.empty:
+            # Keep original index so we can update the master dataframe
+            df_edit = df_filtered.reset_index()
+            # Create readable labels for selection
+            labels = df_edit.apply(lambda r: f"{r['Date'].strftime('%Y-%m-%d')} | {r['User']} | {str(r.get('Notes',''))[:30]}", axis=1).tolist()
+            labels = [l if l is not None else str(i) for i, l in enumerate(labels)]
+
+            selected = st.selectbox("Select entry to edit", ["None"] + labels)
+
+            if selected and selected != "None":
+                sel_idx = labels.index(selected)
+                orig_index = int(df_edit.loc[sel_idx, 'index'])
+                entry = df.loc[orig_index]
+
+                with st.form("edit_entry_form"):
+                    col1e, col2e = st.columns(2)
+                    with col1e:
+                        edit_date = st.date_input("Date", entry['Date'].date() if pd.notna(entry['Date']) else datetime.now())
+                        edit_user = st.text_input("User", entry['User'] if pd.notna(entry['User']) else "")
+                        edit_goal = st.selectbox("Goal", ["Fat Loss", "Clean Bulk", "Recomposition"], index=["Fat Loss","Clean Bulk","Recomposition"].index(entry['Goal']) if pd.notna(entry.get('Goal')) else 0)
+                        edit_weight = st.number_input("Weight (kg)", min_value=0.0, max_value=300.0, value=float(entry['Weight (kg)']) if pd.notna(entry['Weight (kg)']) else 0.0, step=0.1)
+                        edit_body_fat = st.number_input("Body Fat %", min_value=0.0, max_value=100.0, value=float(entry['Body Fat %']) if pd.notna(entry['Body Fat %']) else 0.0, step=0.1)
+                        edit_muscle = st.number_input("Muscle Mass (kg)", min_value=0.0, max_value=200.0, value=float(entry['Muscle Mass (kg)']) if pd.notna(entry['Muscle Mass (kg)']) else 0.0, step=0.1)
+                        edit_fat_mass = st.number_input("Fat Mass (kg)", min_value=0.0, max_value=200.0, value=float(entry['Fat Mass (kg)']) if pd.notna(entry['Fat Mass (kg)']) else 0.0, step=0.1)
+                    with col2e:
+                        edit_waist = st.number_input("Waist (cm)", min_value=0.0, max_value=300.0, value=float(entry['Waist (cm)']) if pd.notna(entry['Waist (cm)']) else 0.0, step=0.1)
+                        edit_chest = st.number_input("Chest (cm)", min_value=0.0, max_value=300.0, value=float(entry['Chest (cm)']) if pd.notna(entry['Chest (cm)']) else 0.0, step=0.1)
+                        edit_arms = st.number_input("Arms (cm)", min_value=0.0, max_value=100.0, value=float(entry['Arms (cm)']) if pd.notna(entry['Arms (cm)']) else 0.0, step=0.1)
+                        edit_thighs = st.number_input("Thighs (cm)", min_value=0.0, max_value=150.0, value=float(entry['Thighs (cm)']) if pd.notna(entry['Thighs (cm)']) else 0.0, step=0.1)
+                        edit_cardio = st.number_input("Cardio Minutes", min_value=0, max_value=1440, value=int(entry['Cardio Minutes']) if pd.notna(entry['Cardio Minutes']) else 0, step=5)
+                        edit_strength = st.number_input("Strength Training Minutes", min_value=0, max_value=1440, value=int(entry['Strength Training Minutes']) if pd.notna(entry['Strength Training Minutes']) else 0, step=5)
+                        edit_steps = st.number_input("Steps", min_value=0, max_value=100000, value=int(entry['Steps']) if pd.notna(entry['Steps']) else 0, step=100)
+                        edit_calories = st.number_input("Calories Consumed", min_value=0, max_value=10000, value=int(entry['Calories Consumed']) if pd.notna(entry['Calories Consumed']) else 0, step=50)
+                        edit_protein = st.number_input("Protein (g)", min_value=0, max_value=500, value=int(entry['Protein (g)']) if pd.notna(entry['Protein (g)']) else 0, step=5)
+                        edit_water = st.number_input("Water (L)", min_value=0.0, max_value=20.0, value=float(entry['Water (L)']) if pd.notna(entry['Water (L)']) else 0.0, step=0.1)
+                        edit_sleep = st.number_input("Sleep Hours", min_value=0.0, max_value=24.0, value=float(entry['Sleep Hours']) if pd.notna(entry['Sleep Hours']) else 0.0, step=0.1)
+                        edit_notes = st.text_area("Notes", value=entry['Notes'] if pd.notna(entry.get('Notes')) else "")
+
+                    save_changes = st.form_submit_button("💾 Save Changes")
+
+                    if save_changes:
+                        # Update the master dataframe
+                        try:
+                            df.loc[orig_index, 'Date'] = pd.to_datetime(edit_date)
+                            df.loc[orig_index, 'User'] = edit_user
+                            df.loc[orig_index, 'Goal'] = edit_goal
+                            df.loc[orig_index, 'Weight (kg)'] = edit_weight if edit_weight > 0 else None
+                            df.loc[orig_index, 'Body Fat %'] = edit_body_fat if edit_body_fat > 0 else None
+                            df.loc[orig_index, 'Muscle Mass (kg)'] = edit_muscle if edit_muscle > 0 else None
+                            df.loc[orig_index, 'Fat Mass (kg)'] = edit_fat_mass if edit_fat_mass > 0 else None
+                            df.loc[orig_index, 'Waist (cm)'] = edit_waist if edit_waist > 0 else None
+                            df.loc[orig_index, 'Chest (cm)'] = edit_chest if edit_chest > 0 else None
+                            df.loc[orig_index, 'Arms (cm)'] = edit_arms if edit_arms > 0 else None
+                            df.loc[orig_index, 'Thighs (cm)'] = edit_thighs if edit_thighs > 0 else None
+                            df.loc[orig_index, 'Cardio Minutes'] = edit_cardio if edit_cardio > 0 else None
+                            df.loc[orig_index, 'Strength Training Minutes'] = edit_strength if edit_strength > 0 else None
+                            df.loc[orig_index, 'Steps'] = edit_steps if edit_steps > 0 else None
+                            df.loc[orig_index, 'Calories Consumed'] = edit_calories if edit_calories > 0 else None
+                            df.loc[orig_index, 'Protein (g)'] = edit_protein if edit_protein > 0 else None
+                            df.loc[orig_index, 'Water (L)'] = edit_water if edit_water > 0 else None
+                            df.loc[orig_index, 'Sleep Hours'] = edit_sleep if edit_sleep > 0 else None
+                            df.loc[orig_index, 'Notes'] = edit_notes if edit_notes.strip() else None
+
+                            # Persist changes
+                            st.session_state.data = df
+                            if save_data(st.session_state.data):
+                                st.success("✅ Entry updated and saved")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to save updated entry")
+                        except Exception as e:
+                            st.error(f"Error updating entry: {e}")
+        else:
+            st.info("No entries match filters to edit.")
+
         # Stats
         col1, col2, col3 = st.columns(3)
         with col1:
