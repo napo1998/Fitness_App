@@ -5,7 +5,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import os
 import numpy as np
-from data_cleaning import clean_dataframe, save_cleaned
+
 
 # Page configuration
 st.set_page_config(
@@ -797,6 +797,6 @@ with tab5:
 st.markdown("---")
 st.markdown("""
     <div style='text-align: center; color: gray;'>
-    <small>❄️ Winter Arc Challenge 2025 |Developed by Napoleon Perez & Arturo Boquins | Transform this winter 💪</small>
+    <small>❄️ Winter Arc Challenge 2025 |Developed by Napoleon Perez & Arturo Boquin | Transform this winter 💪</small>
     </div>
 """, unsafe_allow_html=True)
