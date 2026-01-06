@@ -307,7 +307,42 @@ with st.sidebar:
     if user_option == "Existing User" and existing_users:
         current_user = st.selectbox("Select User", existing_users)
     else:
-        current_user = st.text_input("Enter Username", value="")
+        new_username = st.text_input("Enter Username", value="")
+        if new_username:
+            if st.button("✅ Create User", use_container_width=True):
+                # Check if user already exists
+                if new_username not in existing_users:
+                    # Create a placeholder entry for the new user
+                    placeholder_entry = pd.DataFrame([{
+                        'Date': pd.to_datetime(datetime.now()),
+                        'User': new_username,
+                        'Goal': 'Fat Loss',
+                        'Weight (kg)': None,
+                        'Body Fat %': None,
+                        'Muscle Mass (kg)': None,
+                        'Fat Mass (kg)': None,
+                        'Waist (cm)': None,
+                        'Chest (cm)': None,
+                        'Arms (cm)': None,
+                        'Thighs (cm)': None,
+                        'Cardio Minutes': None,
+                        'Strength Training Minutes': None,
+                        'Steps': None,
+                        'Calories Consumed': None,
+                        'Protein (g)': None,
+                        'Water (L)': None,
+                        'Sleep Hours': None,
+                        'Notes': f"User {new_username} created"
+                    }])
+                    st.session_state.data = pd.concat([st.session_state.data, placeholder_entry], ignore_index=True)
+                    save_data(st.session_state.data)
+                    st.success(f"✅ User '{new_username}' created successfully!")
+                    st.rerun()
+                else:
+                    st.warning(f"⚠️ User '{new_username}' already exists!")
+            current_user = new_username
+        else:
+            current_user = ""
     
     st.markdown("---")
     
