@@ -298,6 +298,9 @@ if 'show_edit_form' not in st.session_state:
 if 'edit_mode' not in st.session_state:
     st.session_state.edit_mode = None
 
+# Load data into df variable (needed for modal and sidebar code below)
+df = st.session_state.data
+
 # Main app
 st.markdown('<div class="main-header">❄️ Winter Arc Challenge 2025</div>', unsafe_allow_html=True)
 
@@ -488,8 +491,6 @@ with st.sidebar:
 
 # Main tabs
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🏆 Rankings", "📊 My Progress", "➕ Add Entry", "📈 Charts", "📋 Data", "🎯 My Goals"])
-
-df = st.session_state.data
 
 with tab1:
     st.header("❄️ Winter Arc Challenge Rankings")
