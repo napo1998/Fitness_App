@@ -675,7 +675,7 @@ with tab3:
         # Choose which user this entry belongs to
         col_u1, col_u2 = st.columns([2,3])
         with col_u1:
-            user_choice = st.selectbox("Select User (or choose New)", ["<New User>"] + users_list, index=1 if current_user in users_list else 0)
+            user_choice = st.selectbox("Select User (or choose New)",users_list, index=1 if current_user in users_list else 0)
         with col_u2:
             if user_choice == "<New User>":
                 entry_user = st.text_input("New Username", value=current_user if current_user else "")
