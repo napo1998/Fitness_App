@@ -288,12 +288,70 @@ def get_rankings(df):
     
     return rankings_df
 
-# Initialize session state
-if 'data' not in st.session_state:
-    st.session_state.data = initialize_data()
+# Initialize session state for edit mode
+if 'show_edit_form' not in st.session_state:
+    st.session_state.show_edit_form = False
+if 'edit_mode' not in st.session_state:
+    st.session_state.edit_mode = None
 
 # Main app
 st.markdown('<div class="main-header">❄️ Winter Arc Challenge 2025</div>', unsafe_allow_html=True)
+
+# Quick Edit Modal from Sidebar
+if st.session_state.show_edit_form and st.session_state.edit_mode is not None:
+    st.info("✏️ **Quick Edit Mode** - Editing entry from sidebar")
+    entry_idx = st.session_state.edit_mode
+    entry = df.loc[entry_idx]
+    
+    with st.form("sidebar_edit_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            edit_weight = st.number_input("Weight (kg)", min_value=0.0, max_value=300.0, 
+                                         value=float(entry['Weight (kg)']) if pd.notna(entry['Weight (kg)']) else 0.0, step=0.1)
+            edit_body_fat = st.number_input("Body Fat %", min_value=0.0, max_value=100.0,
+                                           value=float(entry['Body Fat %']) if pd.notna(entry['Body Fat %']) else 0.0, step=0.1)
+            edit_muscle = st.number_input("Muscle Mass (kg)", min_value=0.0, max_value=200.0,
+                                         value=float(entry['Muscle Mass (kg)']) if pd.notna(entry['Muscle Mass (kg)']) else 0.0, step=0.1)
+            edit_notes = st.text_area("Notes", value=entry['Notes'] if pd.notna(entry.get('Notes')) else "")
+        
+        with col2:
+            edit_cardio = st.number_input("Cardio Minutes", min_value=0, max_value=1440,
+                                         value=int(entry['Cardio Minutes']) if pd.notna(entry['Cardio Minutes']) else 0, step=5)
+            edit_strength = st.number_input("Strength Training Minutes", min_value=0, max_value=1440,
+                                           value=int(entry['Strength Training Minutes']) if pd.notna(entry['Strength Training Minutes']) else 0, step=5)
+            edit_steps = st.number_input("Steps", min_value=0, max_value=100000,
+                                        value=int(entry['Steps']) if pd.notna(entry['Steps']) else 0, step=100)
+            edit_protein = st.number_input("Protein (g)", min_value=0, max_value=500,
+                                          value=int(entry['Protein (g)']) if pd.notna(entry['Protein (g)']) else 0, step=5)
+        
+        col_save, col_cancel = st.columns(2)
+        with col_save:
+            if st.form_submit_button("💾 Save", use_container_width=True):
+                try:
+                    st.session_state.data.at[entry_idx, 'Weight (kg)'] = edit_weight if edit_weight > 0 else None
+                    st.session_state.data.at[entry_idx, 'Body Fat %'] = edit_body_fat if edit_body_fat > 0 else None
+                    st.session_state.data.at[entry_idx, 'Muscle Mass (kg)'] = edit_muscle if edit_muscle > 0 else None
+                    st.session_state.data.at[entry_idx, 'Cardio Minutes'] = edit_cardio if edit_cardio > 0 else None
+                    st.session_state.data.at[entry_idx, 'Strength Training Minutes'] = edit_strength if edit_strength > 0 else None
+                    st.session_state.data.at[entry_idx, 'Steps'] = edit_steps if edit_steps > 0 else None
+                    st.session_state.data.at[entry_idx, 'Protein (g)'] = edit_protein if edit_protein > 0 else None
+                    st.session_state.data.at[entry_idx, 'Notes'] = edit_notes if edit_notes.strip() else None
+                    
+                    if save_data(st.session_state.data):
+                        st.session_state.show_edit_form = False
+                        st.session_state.edit_mode = None
+                        st.success("✅ Entry updated!")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        
+        with col_cancel:
+            if st.form_submit_button("❌ Cancel", use_container_width=True):
+                st.session_state.show_edit_form = False
+                st.session_state.edit_mode = None
+                st.rerun()
+    
+    st.markdown("---")
 
 # Sidebar
 with st.sidebar:
@@ -356,27 +414,51 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Quick Edit Section
+    st.subheader("✏️ Quick Edit")
+    if current_user and not df.empty:
+        user_entries = df[df['User'] == current_user].sort_values('Date', ascending=False)
+        if not user_entries.empty:
+            # Show recent entries
+            recent_labels = user_entries.head(10).apply(
+                lambda r: f"{r['Date'].strftime('%Y-%m-%d')} - {str(r.get('Notes','No notes'))[:20]}", 
+                axis=1
+            ).tolist()
+            
+            selected_edit = st.selectbox(
+                "Select entry to edit",
+                recent_labels,
+                key="sidebar_edit_select"
+            )
+            
+            if selected_edit:
+                # Find the selected entry
+                sel_date_str = selected_edit.split(' - ')[0]
+                entry_to_edit = user_entries[user_entries['Date'].dt.strftime('%Y-%m-%d') == sel_date_str].iloc[0]
+                entry_idx = df[
+                    (df['User'] == current_user) & 
+                    (df['Date'].dt.strftime('%Y-%m-%d') == sel_date_str)
+                ].index[0]
+                
+                col_w, col_e = st.columns(2)
+                with col_w:
+                    st.write(f"**Weight:** {entry_to_edit['Weight (kg)'] if pd.notna(entry_to_edit['Weight (kg)']) else 'N/A'} kg")
+                with col_e:
+                    if st.button("🔧 Edit Now", use_container_width=True, key=f"edit_btn_{entry_idx}"):
+                        st.session_state.edit_mode = entry_idx
+                        st.session_state.show_edit_form = True
+        else:
+            st.info("No entries yet")
+    else:
+        st.info("Select a user to edit entries")
+    
+    st.markdown("---")
+    
     # Data management
     st.subheader("📊 Data Management")
     if st.button("🔄 Refresh Data", use_container_width=True):
         st.session_state.data = initialize_data()
         st.rerun()
-
-    if st.button("🧹 Clean Data", use_container_width=True):
-        try:
-            cleaned = clean_dataframe(st.session_state.data)
-            # Save cleaned to a separate file and update session data
-            saved = save_cleaned(cleaned, CLEANED_FILE)
-            st.session_state.data = cleaned
-            # Overwrite original persistent file as well
-            save_data(st.session_state.data)
-            if saved:
-                st.success(f"🧹 Data cleaned and saved to {CLEANED_FILE}")
-            else:
-                st.warning("🧹 Data cleaned in memory, but failed to save cleaned CSV file.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error cleaning data: {e}")
     
     if not st.session_state.data.empty:
         csv = st.session_state.data.to_csv(index=False)
@@ -853,7 +935,13 @@ with tab5:
 
         # --- Edit existing entry UI ---
         st.markdown("---")
-        st.subheader("✏️ Edit an Entry")
+        
+        col_edit1, col_edit2 = st.columns([2, 1])
+        with col_edit1:
+            st.subheader("✏️ Edit an Entry")
+        with col_edit2:
+            if st.button("🔄 Refresh Entries", use_container_width=True):
+                st.rerun()
 
         if not df_filtered.empty:
             # Keep original index so we can update the master dataframe
