@@ -565,36 +565,36 @@ with tab3:
 
         st.info(f"Adding entry for: **{entry_user}** | Goal: **{entry_goal}**")
             
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.subheader("📅 Date & Body Composition")
-                entry_date = st.date_input("Date", datetime.now())
-                weight = st.number_input("Weight (kg)", min_value=0.0, max_value=300.0, value=0.0, step=0.1)
-                body_fat = st.number_input("Body Fat %", min_value=0.0, max_value=100.0, value=0.0, step=0.1)
-                muscle_mass = st.number_input("Muscle Mass (kg)", min_value=0.0, max_value=200.0, value=0.0, step=0.1)
-                
-                st.subheader("📏 Measurements")
-                waist = st.number_input("Waist (cm)", min_value=0.0, max_value=300.0, value=0.0, step=0.1)
-                chest = st.number_input("Chest (cm)", min_value=0.0, max_value=300.0, value=0.0, step=0.1)
-                arms = st.number_input("Arms (cm)", min_value=0.0, max_value=100.0, value=0.0, step=0.1)
-                thighs = st.number_input("Thighs (cm)", min_value=0.0, max_value=150.0, value=0.0, step=0.1)
-            
-            with col2:
-                st.subheader("🏃 Activity")
-                cardio = st.number_input("Cardio Minutes", min_value=0, max_value=1440, value=0, step=5)
-                strength = st.number_input("Strength Training Minutes", min_value=0, max_value=1440, value=0, step=5)
-                steps = st.number_input("Steps", min_value=0, max_value=100000, value=0, step=100)
-                
-                st.subheader("🍎 Nutrition & Lifestyle")
-                calories = st.number_input("Calories", min_value=0, max_value=10000, value=0, step=50)
-                protein = st.number_input("Protein (g)", min_value=0, max_value=500, value=0, step=5)
-                water = st.number_input("Water (L)", min_value=0.0, max_value=20.0, value=0.0, step=0.1)
-                sleep = st.number_input("Sleep Hours", min_value=0.0, max_value=24.0, value=0.0, step=0.1)
-                
-                notes = st.text_area("Notes", placeholder="How are you feeling? Training notes, energy levels...")
-            
-            submitted = st.form_submit_button("💾 Save Entry", use_container_width=True)
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("📅 Date & Body Composition")
+            entry_date = st.date_input("Date", datetime.now())
+            weight = st.number_input("Weight (kg)", min_value=0.0, max_value=300.0, value=0.0, step=0.1)
+            body_fat = st.number_input("Body Fat %", min_value=0.0, max_value=100.0, value=0.0, step=0.1)
+            muscle_mass = st.number_input("Muscle Mass (kg)", min_value=0.0, max_value=200.0, value=0.0, step=0.1)
+
+            st.subheader("📏 Measurements")
+            waist = st.number_input("Waist (cm)", min_value=0.0, max_value=300.0, value=0.0, step=0.1)
+            chest = st.number_input("Chest (cm)", min_value=0.0, max_value=300.0, value=0.0, step=0.1)
+            arms = st.number_input("Arms (cm)", min_value=0.0, max_value=100.0, value=0.0, step=0.1)
+            thighs = st.number_input("Thighs (cm)", min_value=0.0, max_value=150.0, value=0.0, step=0.1)
+
+        with col2:
+            st.subheader("🏃 Activity")
+            cardio = st.number_input("Cardio Minutes", min_value=0, max_value=1440, value=0, step=5)
+            strength = st.number_input("Strength Training Minutes", min_value=0, max_value=1440, value=0, step=5)
+            steps = st.number_input("Steps", min_value=0, max_value=100000, value=0, step=100)
+
+            st.subheader("🍎 Nutrition & Lifestyle")
+            calories = st.number_input("Calories", min_value=0, max_value=10000, value=0, step=50)
+            protein = st.number_input("Protein (g)", min_value=0, max_value=500, value=0, step=5)
+            water = st.number_input("Water (L)", min_value=0.0, max_value=20.0, value=0.0, step=0.1)
+            sleep = st.number_input("Sleep Hours", min_value=0.0, max_value=24.0, value=0.0, step=0.1)
+
+            notes = st.text_area("Notes", placeholder="How are you feeling? Training notes, energy levels...")
+
+        submitted = st.form_submit_button("💾 Save Entry", use_container_width=True)
             
             if submitted:
                 # Validate that at least one metric is entered
