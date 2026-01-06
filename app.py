@@ -863,28 +863,53 @@ with tab5:
                     if save_changes:
                         # Update the master dataframe
                         try:
-                            df.loc[orig_index, 'Date'] = pd.to_datetime(edit_date)
-                            df.loc[orig_index, 'User'] = edit_user
-                            df.loc[orig_index, 'Goal'] = edit_goal
-                            df.loc[orig_index, 'Weight (kg)'] = edit_weight if edit_weight > 0 else None
-                            df.loc[orig_index, 'Body Fat %'] = edit_body_fat if edit_body_fat > 0 else None
-                            df.loc[orig_index, 'Muscle Mass (kg)'] = edit_muscle if edit_muscle > 0 else None
-                            df.loc[orig_index, 'Fat Mass (kg)'] = edit_fat_mass if edit_fat_mass > 0 else None
-                            df.loc[orig_index, 'Waist (cm)'] = edit_waist if edit_waist > 0 else None
-                            df.loc[orig_index, 'Chest (cm)'] = edit_chest if edit_chest > 0 else None
-                            df.loc[orig_index, 'Arms (cm)'] = edit_arms if edit_arms > 0 else None
-                            df.loc[orig_index, 'Thighs (cm)'] = edit_thighs if edit_thighs > 0 else None
-                            df.loc[orig_index, 'Cardio Minutes'] = edit_cardio if edit_cardio > 0 else None
-                            df.loc[orig_index, 'Strength Training Minutes'] = edit_strength if edit_strength > 0 else None
-                            df.loc[orig_index, 'Steps'] = edit_steps if edit_steps > 0 else None
-                            df.loc[orig_index, 'Calories Consumed'] = edit_calories if edit_calories > 0 else None
-                            df.loc[orig_index, 'Protein (g)'] = edit_protein if edit_protein > 0 else None
-                            df.loc[orig_index, 'Water (L)'] = edit_water if edit_water > 0 else None
-                            df.loc[orig_index, 'Sleep Hours'] = edit_sleep if edit_sleep > 0 else None
-                            df.loc[orig_index, 'Notes'] = edit_notes if edit_notes.strip() else None
+                            # Use the live session dataframe
+                            df_main = st.session_state.data
+
+                            # If original index still exists, update by index
+                            if orig_index in df_main.index:
+                                target_idx = orig_index
+                            else:
+                                # Fallback: try to locate the row by matching Date, User and Notes
+                                row = df_edit.loc[sel_idx]
+                                try:
+                                    # Compare ISO date strings for robustness
+                                    mask = (
+                                        df_main['User'].astype(str) == str(row['User'])
+                                    ) & (
+                                        df_main['Date'].astype(str).str.contains(str(row['Date']))
+                                    )
+                                    matches = df_main[mask]
+                                    if not matches.empty:
+                                        target_idx = matches.index[0]
+                                    else:
+                                        raise KeyError("Could not locate original row")
+                                except Exception:
+                                    raise KeyError("Could not locate original row by fallback match")
+
+                            # Apply updates
+                            df_main.loc[target_idx, 'Date'] = pd.to_datetime(edit_date)
+                            df_main.loc[target_idx, 'User'] = edit_user
+                            df_main.loc[target_idx, 'Goal'] = edit_goal
+                            df_main.loc[target_idx, 'Weight (kg)'] = edit_weight if edit_weight > 0 else None
+                            df_main.loc[target_idx, 'Body Fat %'] = edit_body_fat if edit_body_fat > 0 else None
+                            df_main.loc[target_idx, 'Muscle Mass (kg)'] = edit_muscle if edit_muscle > 0 else None
+                            df_main.loc[target_idx, 'Fat Mass (kg)'] = edit_fat_mass if edit_fat_mass > 0 else None
+                            df_main.loc[target_idx, 'Waist (cm)'] = edit_waist if edit_waist > 0 else None
+                            df_main.loc[target_idx, 'Chest (cm)'] = edit_chest if edit_chest > 0 else None
+                            df_main.loc[target_idx, 'Arms (cm)'] = edit_arms if edit_arms > 0 else None
+                            df_main.loc[target_idx, 'Thighs (cm)'] = edit_thighs if edit_thighs > 0 else None
+                            df_main.loc[target_idx, 'Cardio Minutes'] = edit_cardio if edit_cardio > 0 else None
+                            df_main.loc[target_idx, 'Strength Training Minutes'] = edit_strength if edit_strength > 0 else None
+                            df_main.loc[target_idx, 'Steps'] = edit_steps if edit_steps > 0 else None
+                            df_main.loc[target_idx, 'Calories Consumed'] = edit_calories if edit_calories > 0 else None
+                            df_main.loc[target_idx, 'Protein (g)'] = edit_protein if edit_protein > 0 else None
+                            df_main.loc[target_idx, 'Water (L)'] = edit_water if edit_water > 0 else None
+                            df_main.loc[target_idx, 'Sleep Hours'] = edit_sleep if edit_sleep > 0 else None
+                            df_main.loc[target_idx, 'Notes'] = edit_notes if edit_notes.strip() else None
 
                             # Persist changes
-                            st.session_state.data = df
+                            st.session_state.data = df_main
                             if save_data(st.session_state.data):
                                 st.success("✅ Entry updated and saved")
                                 st.rerun()
