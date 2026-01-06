@@ -321,14 +321,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Profile
-    st.subheader("📊 Profile Info")
-    user_height = st.number_input("Height (cm)", min_value=100.0, max_value=250.0, value=170.0, step=0.1)
-    user_age = st.number_input("Age", min_value=10, max_value=120, value=30, step=1)
-    user_gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-    
-    st.markdown("---")
-    
     # Data management
     st.subheader("📊 Data Management")
     if st.button("🔄 Refresh Data", use_container_width=True):
