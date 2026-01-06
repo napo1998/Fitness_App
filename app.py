@@ -595,57 +595,57 @@ with tab3:
             notes = st.text_area("Notes", placeholder="How are you feeling? Training notes, energy levels...")
 
         submitted = st.form_submit_button("💾 Save Entry", use_container_width=True)
-            
-            if submitted:
-                # Validate that at least one metric is entered
-                has_data = any([
-                    weight > 0, body_fat > 0, muscle_mass > 0,
-                    waist > 0, chest > 0, arms > 0, thighs > 0,
-                    cardio > 0, strength > 0, steps > 0,
-                    calories > 0, protein > 0, water > 0, sleep > 0,
-                    notes.strip()
-                ])
-                
-                if not has_data:
-                    st.error("⚠️ Please enter at least one metric!")
-                else:
-                    # Calculate fat mass if we have weight and body fat
-                    fat_mass = calculate_fat_mass(weight, body_fat) if weight > 0 and body_fat > 0 else None
-                    
-                    # If muscle mass not provided but we can calculate it
-                    if muscle_mass == 0 and fat_mass and weight > 0:
-                        muscle_mass = weight - fat_mass
-                    
-                    new_entry = pd.DataFrame([{
-                        'Date': pd.to_datetime(entry_date),
-                        'User': entry_user,
-                        'Goal': entry_goal,
-                        'Weight (kg)': weight if weight > 0 else None,
-                        'Body Fat %': body_fat if body_fat > 0 else None,
-                        'Muscle Mass (kg)': muscle_mass if muscle_mass > 0 else None,
-                        'Fat Mass (kg)': fat_mass,
-                        'Waist (cm)': waist if waist > 0 else None,
-                        'Chest (cm)': chest if chest > 0 else None,
-                        'Arms (cm)': arms if arms > 0 else None,
-                        'Thighs (cm)': thighs if thighs > 0 else None,
-                        'Cardio Minutes': cardio if cardio > 0 else None,
-                        'Strength Training Minutes': strength if strength > 0 else None,
-                        'Steps': steps if steps > 0 else None,
-                        'Calories Consumed': calories if calories > 0 else None,
-                        'Protein (g)': protein if protein > 0 else None,
-                        'Water (L)': water if water > 0 else None,
-                        'Sleep Hours': sleep if sleep > 0 else None,
-                        'Notes': notes if notes else None
+
+        if submitted:
+            # Validate that at least one metric is entered
+            has_data = any([
+                weight > 0, body_fat > 0, muscle_mass > 0,
+                waist > 0, chest > 0, arms > 0, thighs > 0,
+                cardio > 0, strength > 0, steps > 0,
+                calories > 0, protein > 0, water > 0, sleep > 0,
+                notes.strip()
+            ])
+
+            if not has_data:
+                st.error("⚠️ Please enter at least one metric!")
+            else:
+                # Calculate fat mass if we have weight and body fat
+                fat_mass = calculate_fat_mass(weight, body_fat) if weight > 0 and body_fat > 0 else None
+
+                # If muscle mass not provided but we can calculate it
+                if muscle_mass == 0 and fat_mass and weight > 0:
+                    muscle_mass = weight - fat_mass
+
+                new_entry = pd.DataFrame([{
+                    'Date': pd.to_datetime(entry_date),
+                    'User': entry_user,
+                    'Goal': entry_goal,
+                    'Weight (kg)': weight if weight > 0 else None,
+                    'Body Fat %': body_fat if body_fat > 0 else None,
+                    'Muscle Mass (kg)': muscle_mass if muscle_mass > 0 else None,
+                    'Fat Mass (kg)': fat_mass,
+                    'Waist (cm)': waist if waist > 0 else None,
+                    'Chest (cm)': chest if chest > 0 else None,
+                    'Arms (cm)': arms if arms > 0 else None,
+                    'Thighs (cm)': thighs if thighs > 0 else None,
+                    'Cardio Minutes': cardio if cardio > 0 else None,
+                    'Strength Training Minutes': strength if strength > 0 else None,
+                    'Steps': steps if steps > 0 else None,
+                    'Calories Consumed': calories if calories > 0 else None,
+                    'Protein (g)': protein if protein > 0 else None,
+                    'Water (L)': water if water > 0 else None,
+                    'Sleep Hours': sleep if sleep > 0 else None,
+                    'Notes': notes if notes else None
                     }])
                     
-                    st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
-                    
-                    if save_data(st.session_state.data):
-                        st.success("✅ Entry saved successfully!")
-                        st.balloons()
-                        st.rerun()
-                    else:
-                        st.error("❌ Failed to save entry. Please check your input and try again.")
+                st.session_state.data = pd.concat([st.session_state.data, new_entry], ignore_index=True)
+
+                if save_data(st.session_state.data):
+                    st.success("✅ Entry saved successfully!")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to save entry. Please check your input and try again.")
 
 
 with tab4:
