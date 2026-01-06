@@ -545,12 +545,25 @@ with tab2:
 
 with tab3:
     st.header("➕ Add New Entry")
-    
-    if not current_user:
-        st.warning("⚠️ Please enter a username in the sidebar first!")
-    else:
-        with st.form("entry_form", clear_on_submit=True):
-            st.info(f"Adding entry for: **{current_user}** | Goal: **{user_goal}**")
+
+    # Allow adding entries for any user (not just the sidebar-selected user)
+    users_list = df['User'].dropna().unique().tolist() if not df.empty else []
+
+    with st.form("entry_form", clear_on_submit=True):
+        # Choose which user this entry belongs to
+        col_u1, col_u2 = st.columns([2,3])
+        with col_u1:
+            user_choice = st.selectbox("Select User (or choose New)", ["<New User>"] + users_list, index=1 if current_user in users_list else 0)
+        with col_u2:
+            if user_choice == "<New User>":
+                entry_user = st.text_input("New Username", value=current_user if current_user else "")
+            else:
+                entry_user = st.selectbox("Existing User", users_list, index=users_list.index(user_choice) if user_choice in users_list else 0)
+
+        # Per-entry goal (can differ from sidebar selection)
+        entry_goal = st.selectbox("Entry Goal", ["Fat Loss", "Clean Bulk", "Recomposition"], index=["Fat Loss","Clean Bulk","Recomposition"].index(user_goal) if user_goal in ["Fat Loss","Clean Bulk","Recomposition"] else 0)
+
+        st.info(f"Adding entry for: **{entry_user}** | Goal: **{entry_goal}**")
             
             col1, col2 = st.columns(2)
             
@@ -605,8 +618,8 @@ with tab3:
                     
                     new_entry = pd.DataFrame([{
                         'Date': pd.to_datetime(entry_date),
-                        'User': current_user,
-                        'Goal': user_goal,
+                        'User': entry_user,
+                        'Goal': entry_goal,
                         'Weight (kg)': weight if weight > 0 else None,
                         'Body Fat %': body_fat if body_fat > 0 else None,
                         'Muscle Mass (kg)': muscle_mass if muscle_mass > 0 else None,
