@@ -61,6 +61,35 @@ def create_empty_dataframe():
         'Calories Consumed', 'Protein (g)', 'Water (L)', 'Sleep Hours', 'Notes'
     ])
 
+def load_user_goals():
+    """Load user goals from file"""
+    goals_file = 'user_goals.csv'
+    if os.path.exists(goals_file):
+        try:
+            return pd.read_csv(goals_file)
+        except Exception as e:
+            st.warning(f"Error loading goals: {e}")
+            return pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)', 
+                                        'Target Body Fat %', 'Target Weight (kg)', 'Weeks'])
+    return pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)', 
+                                 'Target Body Fat %', 'Target Weight (kg)', 'Weeks'])
+
+def save_user_goals(goals_df):
+    """Save user goals to file"""
+    try:
+        goals_df.to_csv('user_goals.csv', index=False)
+        return True
+    except Exception as e:
+        st.error(f"Error saving goals: {e}")
+        return False
+
+def get_user_goals(user):
+    """Get goals for specific user"""
+    goals_df = load_user_goals()
+    if user in goals_df['User'].values:
+        return goals_df[goals_df['User'] == user].iloc[0]
+    return None
+
 def save_data(df):
     """Save dataframe to CSV"""
     try:
@@ -345,7 +374,7 @@ with st.sidebar:
             st.error(f"Error: {e}")
 
 # Main tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 Rankings", "📊 My Progress", "➕ Add Entry", "📈 Charts", "📋 Data"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🏆 Rankings", "📊 My Progress", "➕ Add Entry", "📈 Charts", "📋 Data", "🎯 My Goals"])
 
 df = st.session_state.data
 
@@ -792,6 +821,217 @@ with tab5:
             st.metric("Showing", len(df_filtered))
     else:
         st.info("No data available")
+
+with tab6:
+    st.header("🎯 Personal Goals")
+    
+    if not current_user:
+        st.warning("⚠️ Please enter a username in the sidebar first!")
+    else:
+        goals_df = load_user_goals()
+        user_goals = get_user_goals(current_user)
+        
+        st.subheader(f"Goals for {current_user}")
+        
+        with st.form("goals_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Body Composition Goals**")
+                target_weight = st.number_input(
+                    "Target Weight (kg)", 
+                    min_value=0.0, 
+                    max_value=300.0,
+                    value=user_goals['Target Weight (kg)'] if user_goals is not None and pd.notna(user_goals.get('Target Weight (kg)')) else 0.0,
+                    step=0.1
+                )
+                
+                target_fat_mass = st.number_input(
+                    "Target Fat Mass (kg)",
+                    min_value=0.0,
+                    max_value=200.0,
+                    value=user_goals['Target Fat Mass (kg)'] if user_goals is not None and pd.notna(user_goals.get('Target Fat Mass (kg)')) else 0.0,
+                    step=0.1
+                )
+                
+                target_muscle_mass = st.number_input(
+                    "Target Muscle Mass (kg)",
+                    min_value=0.0,
+                    max_value=200.0,
+                    value=user_goals['Target Muscle Mass (kg)'] if user_goals is not None and pd.notna(user_goals.get('Target Muscle Mass (kg)')) else 0.0,
+                    step=0.1
+                )
+            
+            with col2:
+                st.write("**Additional Targets**")
+                target_body_fat_pct = st.number_input(
+                    "Target Body Fat %",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=user_goals['Target Body Fat %'] if user_goals is not None and pd.notna(user_goals.get('Target Body Fat %')) else 0.0,
+                    step=0.1
+                )
+                
+                timeline = st.number_input(
+                    "Timeline (weeks)",
+                    min_value=1,
+                    max_value=52,
+                    value=int(user_goals['Weeks']) if user_goals is not None and pd.notna(user_goals.get('Weeks')) else 12,
+                    step=1
+                )
+                
+                st.info("💡 Set realistic goals with a clear timeline for better tracking!")
+            
+            submitted = st.form_submit_button("💾 Save Goals", use_container_width=True)
+            
+            if submitted:
+                has_goals = any([target_weight > 0, target_fat_mass > 0, target_muscle_mass > 0, target_body_fat_pct > 0])
+                
+                if not has_goals:
+                    st.error("⚠️ Please set at least one goal!")
+                else:
+                    # Update or create goals entry
+                    if user_goals is not None:
+                        goals_df.loc[goals_df['User'] == current_user, 'Target Weight (kg)'] = target_weight
+                        goals_df.loc[goals_df['User'] == current_user, 'Target Fat Mass (kg)'] = target_fat_mass
+                        goals_df.loc[goals_df['User'] == current_user, 'Target Muscle Mass (kg)'] = target_muscle_mass
+                        goals_df.loc[goals_df['User'] == current_user, 'Target Body Fat %'] = target_body_fat_pct
+                        goals_df.loc[goals_df['User'] == current_user, 'Weeks'] = timeline
+                    else:
+                        new_goal = pd.DataFrame([{
+                            'User': current_user,
+                            'Target Weight (kg)': target_weight,
+                            'Target Fat Mass (kg)': target_fat_mass,
+                            'Target Muscle Mass (kg)': target_muscle_mass,
+                            'Target Body Fat %': target_body_fat_pct,
+                            'Weeks': timeline
+                        }])
+                        goals_df = pd.concat([goals_df, new_goal], ignore_index=True)
+                    
+                    if save_user_goals(goals_df):
+                        st.success("✅ Goals saved successfully!")
+                        st.balloons()
+                        st.rerun()
+        
+        st.markdown("---")
+        
+        # Display goals progress
+        if user_goals is not None:
+            st.subheader("📊 Goals Progress")
+            
+            df_user = df[df['User'] == current_user]
+            
+            if not df_user.empty:
+                latest = df_user.sort_values('Date').iloc[-1]
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    if user_goals['Target Weight (kg)'] > 0:
+                        current_weight = latest['Weight (kg)'] if pd.notna(latest['Weight (kg)']) else 0
+                        remaining = user_goals['Target Weight (kg)'] - current_weight
+                        st.metric(
+                            "Weight Target",
+                            f"{user_goals['Target Weight (kg)']:.1f} kg",
+                            delta=f"{remaining:+.1f} kg" if current_weight > 0 else "N/A"
+                        )
+                    else:
+                        st.metric("Weight Target", "Not set")
+                
+                with col2:
+                    if user_goals['Target Fat Mass (kg)'] > 0:
+                        current_fat = latest['Fat Mass (kg)'] if pd.notna(latest['Fat Mass (kg)']) else 0
+                        remaining = user_goals['Target Fat Mass (kg)'] - current_fat
+                        st.metric(
+                            "Fat Mass Target",
+                            f"{user_goals['Target Fat Mass (kg)']:.1f} kg",
+                            delta=f"{remaining:+.1f} kg" if current_fat > 0 else "N/A"
+                        )
+                    else:
+                        st.metric("Fat Mass Target", "Not set")
+                
+                with col3:
+                    if user_goals['Target Muscle Mass (kg)'] > 0:
+                        current_muscle = latest['Muscle Mass (kg)'] if pd.notna(latest['Muscle Mass (kg)']) else 0
+                        remaining = user_goals['Target Muscle Mass (kg)'] - current_muscle
+                        st.metric(
+                            "Muscle Mass Target",
+                            f"{user_goals['Target Muscle Mass (kg)']:.1f} kg",
+                            delta=f"{remaining:+.1f} kg" if current_muscle > 0 else "N/A"
+                        )
+                    else:
+                        st.metric("Muscle Mass Target", "Not set")
+                
+                with col4:
+                    if user_goals['Target Body Fat %'] > 0:
+                        current_bf = latest['Body Fat %'] if pd.notna(latest['Body Fat %']) else 0
+                        remaining = user_goals['Target Body Fat %'] - current_bf
+                        st.metric(
+                            "Body Fat % Target",
+                            f"{user_goals['Target Body Fat %']:.1f}%",
+                            delta=f"{remaining:+.1f}%" if current_bf > 0 else "N/A"
+                        )
+                    else:
+                        st.metric("Body Fat % Target", "Not set")
+                
+                st.markdown("---")
+                st.info(f"📅 Timeline: {int(user_goals['Weeks'])} weeks")
+                
+                # Goals visualization
+                if len(df_user) > 1:
+                    st.subheader("📈 Progress Towards Goals")
+                    
+                    df_user_sorted = df_user.sort_values('Date')
+                    
+                    fig = go.Figure()
+                    
+                    # Muscle Mass goal
+                    if user_goals['Target Muscle Mass (kg)'] > 0:
+                        fig.add_trace(go.Scatter(
+                            x=df_user_sorted['Date'],
+                            y=df_user_sorted['Muscle Mass (kg)'],
+                            name='Muscle Mass (Actual)',
+                            mode='lines+markers',
+                            line=dict(color='#10b981', width=2)
+                        ))
+                        
+                        fig.add_hline(
+                            y=user_goals['Target Muscle Mass (kg)'],
+                            line_dash="dash",
+                            line_color='#10b981',
+                            annotation_text=f"Muscle Target: {user_goals['Target Muscle Mass (kg)']:.1f} kg"
+                        )
+                    
+                    # Fat Mass goal
+                    if user_goals['Target Fat Mass (kg)'] > 0:
+                        fig.add_trace(go.Scatter(
+                            x=df_user_sorted['Date'],
+                            y=df_user_sorted['Fat Mass (kg)'],
+                            name='Fat Mass (Actual)',
+                            mode='lines+markers',
+                            line=dict(color='#ef4444', width=2)
+                        ))
+                        
+                        fig.add_hline(
+                            y=user_goals['Target Fat Mass (kg)'],
+                            line_dash="dash",
+                            line_color='#ef4444',
+                            annotation_text=f"Fat Target: {user_goals['Target Fat Mass (kg)']:.1f} kg"
+                        )
+                    
+                    fig.update_layout(
+                        xaxis_title="Date",
+                        yaxis_title="Mass (kg)",
+                        height=400,
+                        template='plotly_white',
+                        hovermode='x unified'
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Add entries to track progress towards your goals!")
+        else:
+            st.info("No goals set yet. Set your goals above to start tracking!")
 
 # Footer
 st.markdown("---")
