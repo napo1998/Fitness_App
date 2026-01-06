@@ -288,6 +288,10 @@ def get_rankings(df):
     
     return rankings_df
 
+# Initialize session state
+if 'data' not in st.session_state:
+    st.session_state.data = initialize_data()
+
 # Initialize session state for edit mode
 if 'show_edit_form' not in st.session_state:
     st.session_state.show_edit_form = False
