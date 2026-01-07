@@ -671,28 +671,26 @@ with tab3:
     # Allow adding entries for any user (not just the sidebar-selected user)
     users_list = df['User'].dropna().unique().tolist() if not df.empty else []
 
-    with st.form("entry_form", clear_on_submit=True):
-        # Choose which user this entry belongs to
-        # If a user is selected/created in the sidebar, force entries to that user to avoid confusion
-        if current_user:
-            st.info(f"Adding entry as user: **{current_user}**")
-            entry_user = current_user
-        else:
-            col_u1, col_u2 = st.columns([2,3])
-            with col_u1:
-                # include a New User option if there are existing users
-                choices = ["<New User>"] + users_list if users_list else ["<New User>"]
-                user_choice = st.selectbox("Select User (or choose New)", choices)
-            with col_u2:
-                if user_choice == "<New User>":
-                    entry_user = st.text_input("New Username", value="")
-                else:
-                    entry_user = st.selectbox("Existing User", users_list, index=users_list.index(user_choice) if user_choice in users_list else 0)
+    # User selection logic (OUTSIDE the form to avoid Streamlit issues with conditional rendering)
+    if current_user:
+        st.info(f"📝 Adding entry as: **{current_user}**")
+        entry_user = current_user
+    else:
+        col_u1, col_u2 = st.columns([2,3])
+        with col_u1:
+            choices = ["<New User>"] + users_list if users_list else ["<New User>"]
+            user_choice = st.selectbox("Select User (or choose New)", choices)
+        with col_u2:
+            if user_choice == "<New User>":
+                entry_user = st.text_input("New Username", value="", key="new_user_in_add_entry")
+            else:
+                entry_user = user_choice
 
+    with st.form("entry_form", clear_on_submit=True):
         # Per-entry goal (can differ from sidebar selection)
         entry_goal = st.selectbox("Entry Goal", ["Fat Loss", "Clean Bulk", "Recomposition"], index=["Fat Loss","Clean Bulk","Recomposition"].index(user_goal) if user_goal in ["Fat Loss","Clean Bulk","Recomposition"] else 0)
 
-        st.info(f"Adding entry for: **{entry_user}** | Goal: **{entry_goal}**")
+        st.info(f"📝 Adding entry for: **{entry_user}** | Goal: **{entry_goal}**")
             
         col1, col2 = st.columns(2)
 
