@@ -673,14 +673,21 @@ with tab3:
 
     with st.form("entry_form", clear_on_submit=True):
         # Choose which user this entry belongs to
-        col_u1, col_u2 = st.columns([2,3])
-        with col_u1:
-            user_choice = st.selectbox("Select User (or choose New)",users_list, index=1 if current_user in users_list else 0)
-        with col_u2:
-            if user_choice == "<New User>":
-                entry_user = st.text_input("New Username", value=current_user if current_user else "")
-            else:
-                entry_user = st.selectbox("Existing User", users_list, index=users_list.index(user_choice) if user_choice in users_list else 0)
+        # If a user is selected/created in the sidebar, force entries to that user to avoid confusion
+        if current_user:
+            st.info(f"Adding entry as user: **{current_user}**")
+            entry_user = current_user
+        else:
+            col_u1, col_u2 = st.columns([2,3])
+            with col_u1:
+                # include a New User option if there are existing users
+                choices = ["<New User>"] + users_list if users_list else ["<New User>"]
+                user_choice = st.selectbox("Select User (or choose New)", choices)
+            with col_u2:
+                if user_choice == "<New User>":
+                    entry_user = st.text_input("New Username", value="")
+                else:
+                    entry_user = st.selectbox("Existing User", users_list, index=users_list.index(user_choice) if user_choice in users_list else 0)
 
         # Per-entry goal (can differ from sidebar selection)
         entry_goal = st.selectbox("Entry Goal", ["Fat Loss", "Clean Bulk", "Recomposition"], index=["Fat Loss","Clean Bulk","Recomposition"].index(user_goal) if user_goal in ["Fat Loss","Clean Bulk","Recomposition"] else 0)
@@ -951,15 +958,15 @@ with tab5:
         if not df_filtered.empty:
             # Keep original index so we can update the master dataframe
             df_edit = df_filtered.reset_index()
-            # Create readable labels for selection
-            labels = df_edit.apply(lambda r: f"{r['Date'].strftime('%Y-%m-%d')} | {r['User']} | {str(r.get('Notes',''))[:30]}", axis=1).tolist()
-            labels = [l if l is not None else str(i) for i, l in enumerate(labels)]
+            # Create readable labels and use the original dataframe index as the option value
+            df_edit['label'] = df_edit.apply(lambda r: f"{r['Date'].strftime('%Y-%m-%d')} | {r['User']} | {str(r.get('Notes',''))[:30]}", axis=1)
+            options = df_edit['index'].tolist()
+            labels_map = dict(zip(df_edit['index'].tolist(), df_edit['label'].tolist()))
 
-            selected = st.selectbox("Select entry to edit", ["None"] + labels)
+            selected_index = st.selectbox("Select entry to edit", [None] + options, format_func=lambda i: "None" if i is None else labels_map.get(i, str(i)))
 
-            if selected and selected != "None":
-                sel_idx = labels.index(selected)
-                orig_index = int(df_edit.loc[sel_idx, 'index'])
+            if selected_index is not None:
+                orig_index = int(selected_index)
                 entry = df.loc[orig_index]
 
                 with st.form("edit_entry_form"):
@@ -989,16 +996,20 @@ with tab5:
                     save_changes = st.form_submit_button("💾 Save Changes")
 
                     if save_changes:
-                        # Update the master dataframe using direct index assignment
                         try:
-                            # Use .at[] for direct, fast scalar assignment to session state
+                            # Compute fat mass if not provided but weight+body fat exist
+                            fat_mass_val = edit_fat_mass if edit_fat_mass > 0 else (calculate_fat_mass(edit_weight, edit_body_fat) if edit_weight > 0 and edit_body_fat > 0 else None)
+
+                            # Compute muscle mass if not provided but weight and fat mass exist
+                            muscle_val = edit_muscle if edit_muscle > 0 else (edit_weight - fat_mass_val if fat_mass_val is not None and edit_weight > 0 else None)
+
                             st.session_state.data.at[orig_index, 'Date'] = pd.to_datetime(edit_date)
                             st.session_state.data.at[orig_index, 'User'] = edit_user
                             st.session_state.data.at[orig_index, 'Goal'] = edit_goal
                             st.session_state.data.at[orig_index, 'Weight (kg)'] = edit_weight if edit_weight > 0 else None
                             st.session_state.data.at[orig_index, 'Body Fat %'] = edit_body_fat if edit_body_fat > 0 else None
-                            st.session_state.data.at[orig_index, 'Muscle Mass (kg)'] = edit_muscle if edit_muscle > 0 else None
-                            st.session_state.data.at[orig_index, 'Fat Mass (kg)'] = edit_fat_mass if edit_fat_mass > 0 else None
+                            st.session_state.data.at[orig_index, 'Muscle Mass (kg)'] = muscle_val if muscle_val is not None and muscle_val > 0 else None
+                            st.session_state.data.at[orig_index, 'Fat Mass (kg)'] = fat_mass_val if fat_mass_val is not None and fat_mass_val > 0 else None
                             st.session_state.data.at[orig_index, 'Waist (cm)'] = edit_waist if edit_waist > 0 else None
                             st.session_state.data.at[orig_index, 'Chest (cm)'] = edit_chest if edit_chest > 0 else None
                             st.session_state.data.at[orig_index, 'Arms (cm)'] = edit_arms if edit_arms > 0 else None
@@ -1020,6 +1031,20 @@ with tab5:
                                 st.error("❌ Failed to save updated entry")
                         except Exception as e:
                             st.error(f"Error updating entry: {e}")
+
+                # Deletion option in an expander to avoid accidental presses
+                with st.expander("🗑️ Delete this entry"):
+                    st.warning("This will permanently delete the selected entry.")
+                    if st.button("🗑️ Delete Entry", key=f"delete_{orig_index}"):
+                        try:
+                            st.session_state.data = st.session_state.data.drop(index=orig_index).reset_index(drop=True)
+                            if save_data(st.session_state.data):
+                                st.success("✅ Entry deleted")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to delete entry")
+                        except Exception as e:
+                            st.error(f"Error deleting entry: {e}")
         else:
             st.info("No entries match filters to edit.")
 
