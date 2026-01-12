@@ -5,6 +5,8 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import os
 import numpy as np
+import shutil
+from pathlib import Path
 
 
 # Page configuration
@@ -37,16 +39,75 @@ st.markdown("""
 # Data file path
 DATA_FILE = 'fitness_competition_data.csv'
 CLEANED_FILE = 'fitness_competition_data_cleaned.csv'
+BACKUP_DIR = '.data_backups'
+BACKUP_INTERVAL = 5  # Save backup every 5 minutes
+
+def ensure_backup_dir():
+    """Ensure backup directory exists"""
+    if not os.path.exists(BACKUP_DIR):
+        os.makedirs(BACKUP_DIR)
+
+def create_backup(filename=DATA_FILE):
+    """Create a timestamped backup of the data file"""
+    ensure_backup_dir()
+    if os.path.exists(filename):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = os.path.join(BACKUP_DIR, f"backup_{timestamp}_{os.path.basename(filename)}")
+        try:
+            shutil.copy2(filename, backup_file)
+            # Keep only last 10 backups
+            cleanup_old_backups()
+            return backup_file
+        except Exception as e:
+            st.warning(f"Could not create backup: {e}")
+    return None
+
+def cleanup_old_backups(max_backups=10):
+    """Keep only the most recent backups"""
+    ensure_backup_dir()
+    try:
+        backup_files = sorted(Path(BACKUP_DIR).glob("backup_*.csv"))
+        if len(backup_files) > max_backups:
+            for old_file in backup_files[:-max_backups]:
+                os.remove(old_file)
+    except Exception as e:
+        pass  # Silent fail for cleanup
+
+def restore_from_backup(backup_file):
+    """Restore data from a backup file"""
+    try:
+        df = pd.read_csv(backup_file)
+        df['Date'] = pd.to_datetime(df['Date'])
+        return df
+    except Exception as e:
+        st.error(f"Error restoring from backup: {e}")
+        return None
+
+def get_available_backups():
+    """Get list of available backup files"""
+    ensure_backup_dir()
+    try:
+        return sorted(Path(BACKUP_DIR).glob("backup_*.csv"), reverse=True)
+    except:
+        return []
 
 def initialize_data():
-    """Initialize or load existing data"""
+    """Initialize or load existing data with recovery mechanism"""
     if os.path.exists(DATA_FILE):
         try:
             df = pd.read_csv(DATA_FILE)
             df['Date'] = pd.to_datetime(df['Date'])
             return df
         except Exception as e:
-            st.error(f"Error loading data: {e}")
+            st.error(f"Error loading main data file: {e}")
+            # Try to recover from backup
+            st.info("Attempting to recover from backup...")
+            backups = get_available_backups()
+            if backups:
+                df = restore_from_backup(str(backups[0]))
+                if df is not None:
+                    st.success(f"✅ Recovered from backup: {backups[0].name}")
+                    return df
             return create_empty_dataframe()
     else:
         return create_empty_dataframe()
@@ -75,9 +136,12 @@ def load_user_goals():
                                  'Target Body Fat %', 'Target Weight (kg)', 'Weeks'])
 
 def save_user_goals(goals_df):
-    """Save user goals to file"""
+    """Save user goals to file with backup"""
     try:
-        goals_df.to_csv('user_goals.csv', index=False)
+        goals_file = 'user_goals.csv'
+        if os.path.exists(goals_file):
+            create_backup(goals_file)
+        goals_df.to_csv(goals_file, index=False)
         return True
     except Exception as e:
         st.error(f"Error saving goals: {e}")
@@ -91,8 +155,10 @@ def get_user_goals(user):
     return None
 
 def save_data(df):
-    """Save dataframe to CSV"""
+    """Save dataframe to CSV with automatic backup"""
     try:
+        # Create backup before saving
+        create_backup()
         df.to_csv(DATA_FILE, index=False)
         return True
     except Exception as e:
@@ -291,6 +357,18 @@ def get_rankings(df):
 # Initialize session state
 if 'data' not in st.session_state:
     st.session_state.data = initialize_data()
+
+if 'last_save_time' not in st.session_state:
+    st.session_state.last_save_time = datetime.now()
+
+if 'show_backups' not in st.session_state:
+    st.session_state.show_backups = False
+
+def save_data_to_session(df):
+    """Save data to session state and file"""
+    st.session_state.data = df
+    save_data(df)
+    st.session_state.last_save_time = datetime.now()
 
 # Load data into df variable
 df = st.session_state.data
@@ -926,6 +1004,51 @@ with tab5:
             st.metric("Showing", len(df_filtered))
     else:
         st.info("No data available")
+
+    # Data Recovery Section
+    st.markdown("---")
+    st.subheader("💾 Data Management & Recovery")
+    
+    recovery_col1, recovery_col2, recovery_col3 = st.columns(3)
+    
+    with recovery_col1:
+        if st.button("🔄 Manual Backup Now", use_container_width=True):
+            backup_file = create_backup()
+            if backup_file:
+                st.success(f"✅ Backup created: {os.path.basename(backup_file)}")
+            else:
+                st.error("❌ Failed to create backup")
+    
+    with recovery_col2:
+        if st.button("📥 View Backups", use_container_width=True):
+            st.session_state.show_backups = True
+    
+    with recovery_col3:
+        last_save = st.session_state.last_save_time
+        time_since_save = (datetime.now() - last_save).total_seconds() / 60
+        st.metric("Last Save (min ago)", f"{time_since_save:.1f}")
+    
+    # Show available backups
+    if st.session_state.get("show_backups", False):
+        st.info("📋 Available Backups (Most Recent First)")
+        backups = get_available_backups()
+        
+        if backups:
+            for backup_file in backups[:10]:  # Show last 10 backups
+                col_info, col_restore = st.columns([3, 1])
+                with col_info:
+                    file_size = os.path.getsize(backup_file) / 1024  # Size in KB
+                    st.caption(f"📁 {backup_file.name} ({file_size:.1f} KB)")
+                with col_restore:
+                    if st.button("Restore", key=f"restore_{backup_file.name}"):
+                        restored_df = restore_from_backup(str(backup_file))
+                        if restored_df is not None:
+                            st.session_state.data = restored_df
+                            df = restored_df
+                            st.success(f"✅ Restored from {backup_file.name}")
+                            st.rerun()
+        else:
+            st.info("No backups available yet. Create one with the button above.")
 
 with tab6:
     st.header("🎯 Personal Goals")
