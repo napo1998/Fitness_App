@@ -38,6 +38,7 @@ st.markdown("""
 
 # Data file path
 DATA_FILE = 'data.json'
+CSV_FILE = 'data.csv'
 CLEANED_FILE = 'data_cleaned.json'
 BACKUP_DIR = '.data_backups'
 BACKUP_INTERVAL = 5  # Save backup every 5 minutes
@@ -97,6 +98,8 @@ def initialize_data():
         try:
             df = pd.read_json(DATA_FILE)
             df['Date'] = pd.to_datetime(df['Date'])
+            # Also ensure CSV is up to date on load
+            save_data_to_csv(df)
             return df
         except Exception as e:
             st.error(f"Error loading main data file: {e}")
@@ -109,8 +112,28 @@ def initialize_data():
                     st.success(f"✅ Recovered from backup: {backups[0].name}")
                     return df
             return create_empty_dataframe()
+    elif os.path.exists(CSV_FILE):
+        # If JSON doesn't exist but CSV does, load from CSV
+        try:
+            df = pd.read_csv(CSV_FILE)
+            df['Date'] = pd.to_datetime(df['Date'])
+            return df
+        except Exception as e:
+            st.error(f"Error loading CSV file: {e}")
+            return create_empty_dataframe()
     else:
         return create_empty_dataframe()
+
+def save_data_to_csv(df):
+    """Save dataframe to CSV only (helper function)"""
+    try:
+        df_csv = df.copy()
+        if 'Date' in df_csv.columns:
+            df_csv['Date'] = pd.to_datetime(df_csv['Date']).dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_csv.to_csv(CSV_FILE, index=False)
+        return True
+    except Exception as e:
+        return False
 
 def create_empty_dataframe():
     """Create empty dataframe with proper structure"""
@@ -155,11 +178,20 @@ def get_user_goals(user):
     return None
 
 def save_data(df):
-    """Save dataframe to JSON with automatic backup"""
+    """Save dataframe to JSON and CSV with automatic backup"""
     try:
         # Create backup before saving
         create_backup()
+
+        # Save to JSON (existing format)
         df.to_json(DATA_FILE, orient='records', date_format='iso')
+
+        # Save to CSV (for easy export and GitHub tracking)
+        df_csv = df.copy()
+        if 'Date' in df_csv.columns:
+            df_csv['Date'] = pd.to_datetime(df_csv['Date']).dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_csv.to_csv(CSV_FILE, index=False)
+
         return True
     except Exception as e:
         st.error(f"Error saving data: {e}")
@@ -875,7 +907,28 @@ with tab4:
 
 with tab5:
     st.header("📋 Data Table")
-    
+
+    # CSV Export Section
+    if not df.empty:
+        col_export1, col_export2 = st.columns([3, 1])
+        with col_export1:
+            st.subheader("💾 Export Data")
+        with col_export2:
+            # Create CSV for download
+            csv_data = df.copy()
+            csv_data['Date'] = pd.to_datetime(csv_data['Date']).dt.strftime('%Y-%m-%d %H:%M:%S')
+            csv_string = csv_data.to_csv(index=False)
+
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv_string,
+                file_name=f"fitness_data_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+        st.markdown("---")
+
     if not df.empty:
         # Filter options
         col1, col2, col3 = st.columns(3)
