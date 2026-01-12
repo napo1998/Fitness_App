@@ -13,7 +13,7 @@ The Fitness App now includes a comprehensive data persistence and recovery syste
 ### 2. **In-Memory Session State Management**
 - Data is loaded into `st.session_state` when the app starts
 - Session state maintains data across Streamlit reruns
-- `last_save_time` tracks when data was last persisted to disk
+- `last_save_time` tracks when data was last persisted to disk (for developers)
 
 ### 3. **Automatic Backup System**
 - **Backup Directory**: `.data_backups/` (hidden folder)
@@ -60,28 +60,20 @@ Session state loaded with recovered data
 
 ## Using the System
 
-### In the App
+### How It Works (Automatic)
+The system works completely automatically - no user action required:
 
-#### Manual Backup (📋 Data Tab → Data Management & Recovery)
-1. Click **"🔄 Manual Backup Now"** button
-2. System creates timestamped backup
-3. Confirmation message shows backup file name
+1. **When you add an entry** → Automatically saved to CSV + backup created
+2. **When you edit an entry** → Old data backed up first, then saved to CSV
+3. **When you delete an entry** → Data backed up first, then deleted from CSV
+4. **When you restart the app** → Data loads from CSV automatically
 
-#### View Available Backups
-1. Click **"📥 View Backups"** button
-2. See list of recent backups (most recent first)
-3. File size shown in KB
+**Users don't need to do anything.** All data is saved and backed up in the background.
 
-#### Restore from Backup
-1. Click **"Restore"** button next to desired backup
-2. Data immediately restored from backup
-3. App automatically refreshes
-4. Continue working with recovered data
-
-### Last Save Time
-- **Metric Display**: Shows minutes since last save
-- **Auto Updates**: Refreshes after each modification
-- **Helps Track**: Data safety and persistence
+### Backup and Recovery
+- **Backups**: Created automatically before every save (hidden folder `.data_backups/`)
+- **Recovery**: Automatic if main CSV is corrupted on app startup
+- **Access**: Backups stored in `.data_backups/` folder for manual recovery if needed
 
 ## File Locations
 

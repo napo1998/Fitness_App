@@ -361,9 +361,6 @@ if 'data' not in st.session_state:
 if 'last_save_time' not in st.session_state:
     st.session_state.last_save_time = datetime.now()
 
-if 'show_backups' not in st.session_state:
-    st.session_state.show_backups = False
-
 def save_data_to_session(df):
     """Save data to session state and file"""
     st.session_state.data = df
@@ -1004,51 +1001,6 @@ with tab5:
             st.metric("Showing", len(df_filtered))
     else:
         st.info("No data available")
-
-    # Data Recovery Section
-    st.markdown("---")
-    st.subheader("💾 Data Management & Recovery")
-    
-    recovery_col1, recovery_col2, recovery_col3 = st.columns(3)
-    
-    with recovery_col1:
-        if st.button("🔄 Manual Backup Now", use_container_width=True):
-            backup_file = create_backup()
-            if backup_file:
-                st.success(f"✅ Backup created: {os.path.basename(backup_file)}")
-            else:
-                st.error("❌ Failed to create backup")
-    
-    with recovery_col2:
-        if st.button("📥 View Backups", use_container_width=True):
-            st.session_state.show_backups = True
-    
-    with recovery_col3:
-        last_save = st.session_state.last_save_time
-        time_since_save = (datetime.now() - last_save).total_seconds() / 60
-        st.metric("Last Save (min ago)", f"{time_since_save:.1f}")
-    
-    # Show available backups
-    if st.session_state.get("show_backups", False):
-        st.info("📋 Available Backups (Most Recent First)")
-        backups = get_available_backups()
-        
-        if backups:
-            for backup_file in backups[:10]:  # Show last 10 backups
-                col_info, col_restore = st.columns([3, 1])
-                with col_info:
-                    file_size = os.path.getsize(backup_file) / 1024  # Size in KB
-                    st.caption(f"📁 {backup_file.name} ({file_size:.1f} KB)")
-                with col_restore:
-                    if st.button("Restore", key=f"restore_{backup_file.name}"):
-                        restored_df = restore_from_backup(str(backup_file))
-                        if restored_df is not None:
-                            st.session_state.data = restored_df
-                            df = restored_df
-                            st.success(f"✅ Restored from {backup_file.name}")
-                            st.rerun()
-        else:
-            st.info("No backups available yet. Create one with the button above.")
 
 with tab6:
     st.header("🎯 Personal Goals")
