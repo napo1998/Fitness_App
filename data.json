@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "Date": "2025-01-12",
+    "User": "",
+    "Goal": "",
+    "Weight (kg)": null,
+    "Body Fat %": null,
+    "Muscle Mass (kg)": null,
+    "Fat Mass (kg)": null,
+    "Waist (cm)": null,
+    "Chest (cm)": null,
+    "Arms (cm)": null,
+    "Thighs (cm)": null,
+    "Cardio Minutes": null,
+    "Strength Training Minutes": null,
+    "Steps": null,
+    "Calories Consumed": null,
+    "Protein (g)": null,
+    "Water (L)": null,
+    "Sleep Hours": null,
+    "Notes": ""
+  }
+]
