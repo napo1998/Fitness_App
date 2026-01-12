@@ -37,8 +37,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Data file path
-DATA_FILE = 'fitness_competition_data.csv'
-CLEANED_FILE = 'fitness_competition_data_cleaned.csv'
+DATA_FILE = 'data.json'
+CLEANED_FILE = 'data_cleaned.json'
 BACKUP_DIR = '.data_backups'
 BACKUP_INTERVAL = 5  # Save backup every 5 minutes
 
@@ -66,7 +66,7 @@ def cleanup_old_backups(max_backups=10):
     """Keep only the most recent backups"""
     ensure_backup_dir()
     try:
-        backup_files = sorted(Path(BACKUP_DIR).glob("backup_*.csv"))
+        backup_files = sorted(Path(BACKUP_DIR).glob("backup_*.json"))
         if len(backup_files) > max_backups:
             for old_file in backup_files[:-max_backups]:
                 os.remove(old_file)
@@ -76,7 +76,7 @@ def cleanup_old_backups(max_backups=10):
 def restore_from_backup(backup_file):
     """Restore data from a backup file"""
     try:
-        df = pd.read_csv(backup_file)
+        df = pd.read_json(backup_file)
         df['Date'] = pd.to_datetime(df['Date'])
         return df
     except Exception as e:
@@ -87,7 +87,7 @@ def get_available_backups():
     """Get list of available backup files"""
     ensure_backup_dir()
     try:
-        return sorted(Path(BACKUP_DIR).glob("backup_*.csv"), reverse=True)
+        return sorted(Path(BACKUP_DIR).glob("backup_*.json"), reverse=True)
     except:
         return []
 
@@ -95,7 +95,7 @@ def initialize_data():
     """Initialize or load existing data with recovery mechanism"""
     if os.path.exists(DATA_FILE):
         try:
-            df = pd.read_csv(DATA_FILE)
+            df = pd.read_json(DATA_FILE)
             df['Date'] = pd.to_datetime(df['Date'])
             return df
         except Exception as e:
@@ -155,15 +155,14 @@ def get_user_goals(user):
     return None
 
 def save_data(df):
-    """Save dataframe to CSV with automatic backup"""
+    """Save dataframe to JSON with automatic backup"""
     try:
         # Create backup before saving
         create_backup()
-        df.to_csv(DATA_FILE, index=False)
+        df.to_json(DATA_FILE, orient='records', date_format='iso')
         return True
     except Exception as e:
         st.error(f"Error saving data: {e}")
-        return False
         return False
 
 def calculate_fat_mass(weight, body_fat_pct):
