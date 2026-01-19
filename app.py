@@ -86,6 +86,10 @@ def save_csv_to_github(config, file_path, df, commit_message):
         data['sha'] = sha
 
     response = requests.put(url, headers=headers, json=data)
+
+    if response.status_code not in [200, 201]:
+        st.error(f"GitHub API Error: {response.status_code} - {response.text}")
+
     return response.status_code in [200, 201]
 
 # Page configuration
@@ -116,9 +120,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Data file path - CSV only for GitHub repo storage
+# Use paths relative to repo root (adjust if files are in a subfolder)
 CSV_FILE = 'data.csv'
 GOALS_FILE = 'user_goals.csv'
 BACKUP_DIR = '.data_backups'
+
+# For GitHub API - if your app is in a subfolder, specify the path from repo root
+# e.g., 'Fitness_App/data.csv' if the CSV is inside the Fitness_App folder
+GITHUB_CSV_PATH = 'data.csv'  # Change to 'Fitness_App/data.csv' if needed
+GITHUB_GOALS_PATH = 'user_goals.csv'  # Change to 'Fitness_App/user_goals.csv' if needed
 
 def ensure_backup_dir():
     """Ensure backup directory exists"""
@@ -175,7 +185,7 @@ def initialize_data():
 
     if config:
         try:
-            df = load_csv_from_github(config, CSV_FILE)
+            df = load_csv_from_github(config, GITHUB_CSV_PATH)
             if df is not None:
                 df['Date'] = pd.to_datetime(df['Date'])
                 return df
@@ -222,7 +232,7 @@ def load_user_goals():
 
     if config:
         try:
-            df = load_csv_from_github(config, GOALS_FILE)
+            df = load_csv_from_github(config, GITHUB_GOALS_PATH)
             if df is not None:
                 return df
         except Exception as e:
@@ -243,7 +253,7 @@ def save_user_goals(goals_df):
 
     if config:
         try:
-            if save_csv_to_github(config, GOALS_FILE, goals_df, "Update user goals"):
+            if save_csv_to_github(config, GITHUB_GOALS_PATH, goals_df, "Update user goals"):
                 return True
             else:
                 st.error("Failed to save goals to GitHub")
@@ -269,7 +279,7 @@ def save_data(df):
     if config:
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-            if save_csv_to_github(config, CSV_FILE, df, f"Update fitness data - {timestamp}"):
+            if save_csv_to_github(config, GITHUB_CSV_PATH, df, f"Update fitness data - {timestamp}"):
                 return True
             else:
                 st.error("Failed to save data to GitHub")
