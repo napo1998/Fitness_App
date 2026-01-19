@@ -3,10 +3,18 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
-import os
 import numpy as np
+import os
 import shutil
 from pathlib import Path
+
+# Import database module
+try:
+    from database import DatabaseManager, get_db_manager
+    DB_AVAILABLE = True
+except ImportError:
+    DB_AVAILABLE = False
+    st.warning("Database module not available. Using file-based storage only.")
 
 
 # Page configuration
@@ -94,6 +102,25 @@ def get_available_backups():
 
 def initialize_data():
     """Initialize or load existing data with recovery mechanism"""
+    # Try to load from PostgreSQL first
+    if DB_AVAILABLE:
+        try:
+            db_manager = get_db_manager()
+
+            # Test connection and create tables if needed
+            if db_manager.test_connection():
+                db_manager.create_tables()
+                df = db_manager.load_dataframe_from_db()
+
+                # If database has data, use it
+                if not df.empty:
+                    # Sync to CSV backup
+                    save_data_to_csv(df)
+                    return df
+        except Exception as e:
+            st.warning(f"Database not available: {e}. Falling back to file storage.")
+
+    # Fallback to file-based storage
     if os.path.exists(DATA_FILE):
         try:
             df = pd.read_json(DATA_FILE)
@@ -146,21 +173,41 @@ def create_empty_dataframe():
     ])
 
 def load_user_goals():
-    """Load user goals from file"""
+    """Load user goals from database or file"""
+    # Try database first
+    if DB_AVAILABLE:
+        try:
+            db_manager = get_db_manager()
+            goals_df = db_manager.load_user_goals_from_db()
+            if not goals_df.empty:
+                return goals_df
+        except Exception as e:
+            st.warning(f"Could not load goals from database: {e}. Using file storage.")
+
+    # Fallback to file
     goals_file = 'user_goals.csv'
     if os.path.exists(goals_file):
         try:
             return pd.read_csv(goals_file)
         except Exception as e:
             st.warning(f"Error loading goals: {e}")
-            return pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)', 
+            return pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)',
                                         'Target Body Fat %', 'Target Weight (kg)', 'Weeks'])
-    return pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)', 
+    return pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)',
                                  'Target Body Fat %', 'Target Weight (kg)', 'Weeks'])
 
 def save_user_goals(goals_df):
-    """Save user goals to file with backup"""
+    """Save user goals to database and file with backup"""
     try:
+        # Save to database first
+        if DB_AVAILABLE:
+            try:
+                db_manager = get_db_manager()
+                db_manager.save_user_goals_to_db(goals_df)
+            except Exception as e:
+                st.warning(f"Could not save goals to database: {e}. Saving to file only.")
+
+        # Save to file (backup)
         goals_file = 'user_goals.csv'
         if os.path.exists(goals_file):
             create_backup(goals_file)
@@ -178,12 +225,23 @@ def get_user_goals(user):
     return None
 
 def save_data(df):
-    """Save dataframe to JSON and CSV with automatic backup"""
+    """Save dataframe to PostgreSQL, JSON and CSV with automatic backup"""
     try:
         # Create backup before saving
         create_backup()
 
-        # Save to JSON (existing format)
+        # Save to PostgreSQL first (if available)
+        db_saved = False
+        if DB_AVAILABLE:
+            try:
+                db_manager = get_db_manager()
+                db_saved = db_manager.save_dataframe_to_db(df)
+                if db_saved:
+                    st.success("✅ Data saved to PostgreSQL database")
+            except Exception as e:
+                st.warning(f"Could not save to database: {e}. Saving to files only.")
+
+        # Save to JSON (existing format - for backup)
         df.to_json(DATA_FILE, orient='records', date_format='iso')
 
         # Save to CSV (for easy export and GitHub tracking)
@@ -910,9 +968,13 @@ with tab5:
 
     # CSV Export Section
     if not df.empty:
+        st.subheader("💾 Export Data")
+
         col_export1, col_export2 = st.columns([3, 1])
+
         with col_export1:
-            st.subheader("💾 Export Data")
+            st.write("Export your fitness data to CSV")
+
         with col_export2:
             # Create CSV for download
             csv_data = df.copy()

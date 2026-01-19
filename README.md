@@ -1,10 +1,8 @@
 
-# Fitness_App
-
-# Fitness & Body Composition Tracker - Setup Guide
+# Winter Arc Challenge 2025 - Fitness Tracking App
 
 ## Overview
-This Streamlit app allows you to track body fat, fitness metrics, and various health measurements using Google Sheets as your database.
+A comprehensive fitness tracking application built with Streamlit for the Winter Arc Challenge 2025. Track body composition, workouts, nutrition, and compete with friends towards your fitness goals. Data is stored locally in JSON and CSV formats for easy backup and analysis.
 
 ## Features
 - 📊 Interactive dashboard with key metrics

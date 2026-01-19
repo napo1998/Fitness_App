@@ -4,3 +4,6 @@ plotly
 gspread
 google-auth
 gspread-dataframe
+psycopg2-binary
+sqlalchemy
+python-dotenv
