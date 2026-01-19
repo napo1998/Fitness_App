@@ -7,15 +7,86 @@ import numpy as np
 import os
 import shutil
 from pathlib import Path
+import requests
+import base64
+from io import StringIO
 
-# Import database module
-try:
-    from database import DatabaseManager, get_db_manager
-    DB_AVAILABLE = True
-except ImportError:
-    DB_AVAILABLE = False
-    st.warning("Database module not available. Using file-based storage only.")
+# GitHub configuration - set these in Streamlit secrets
+# Required secrets: GITHUB_TOKEN, GITHUB_REPO, GITHUB_OWNER
+def get_github_config():
+    """Get GitHub configuration from Streamlit secrets"""
+    try:
+        return {
+            'token': st.secrets["GITHUB_TOKEN"],
+            'repo': st.secrets["GITHUB_REPO"],
+            'owner': st.secrets["GITHUB_OWNER"],
+            'branch': st.secrets.get("GITHUB_BRANCH", "main")
+        }
+    except Exception as e:
+        st.error(f"GitHub secrets not configured: {e}")
+        return None
 
+def get_file_sha(config, file_path):
+    """Get the SHA of an existing file (needed for updates)"""
+    url = f"https://api.github.com/repos/{config['owner']}/{config['repo']}/contents/{file_path}"
+    headers = {
+        'Authorization': f"token {config['token']}",
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    params = {'ref': config['branch']}
+
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        return response.json().get('sha')
+    return None
+
+def load_csv_from_github(config, file_path):
+    """Load CSV file from GitHub repo"""
+    url = f"https://api.github.com/repos/{config['owner']}/{config['repo']}/contents/{file_path}"
+    headers = {
+        'Authorization': f"token {config['token']}",
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    params = {'ref': config['branch']}
+
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        content = response.json().get('content', '')
+        decoded = base64.b64decode(content).decode('utf-8')
+        return pd.read_csv(StringIO(decoded))
+    return None
+
+def save_csv_to_github(config, file_path, df, commit_message):
+    """Save CSV file to GitHub repo via API"""
+    url = f"https://api.github.com/repos/{config['owner']}/{config['repo']}/contents/{file_path}"
+    headers = {
+        'Authorization': f"token {config['token']}",
+        'Accept': 'application/vnd.github.v3+json'
+    }
+
+    # Convert dataframe to CSV string
+    df_csv = df.copy()
+    if 'Date' in df_csv.columns:
+        df_csv['Date'] = pd.to_datetime(df_csv['Date']).dt.strftime('%Y-%m-%d %H:%M:%S')
+    csv_content = df_csv.to_csv(index=False)
+
+    # Encode content to base64
+    encoded_content = base64.b64encode(csv_content.encode('utf-8')).decode('utf-8')
+
+    # Get existing file SHA if it exists
+    sha = get_file_sha(config, file_path)
+
+    data = {
+        'message': commit_message,
+        'content': encoded_content,
+        'branch': config['branch']
+    }
+
+    if sha:
+        data['sha'] = sha
+
+    response = requests.put(url, headers=headers, json=data)
+    return response.status_code in [200, 201]
 
 # Page configuration
 st.set_page_config(
@@ -44,19 +115,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Data file path
-DATA_FILE = 'data.json'
+# Data file path - CSV only for GitHub repo storage
 CSV_FILE = 'data.csv'
-CLEANED_FILE = 'data_cleaned.json'
+GOALS_FILE = 'user_goals.csv'
 BACKUP_DIR = '.data_backups'
-BACKUP_INTERVAL = 5  # Save backup every 5 minutes
 
 def ensure_backup_dir():
     """Ensure backup directory exists"""
     if not os.path.exists(BACKUP_DIR):
         os.makedirs(BACKUP_DIR)
 
-def create_backup(filename=DATA_FILE):
+def create_backup(filename=CSV_FILE):
     """Create a timestamped backup of the data file"""
     ensure_backup_dir()
     if os.path.exists(filename):
@@ -75,7 +144,7 @@ def cleanup_old_backups(max_backups=10):
     """Keep only the most recent backups"""
     ensure_backup_dir()
     try:
-        backup_files = sorted(Path(BACKUP_DIR).glob("backup_*.json"))
+        backup_files = sorted(Path(BACKUP_DIR).glob("backup_*.csv"))
         if len(backup_files) > max_backups:
             for old_file in backup_files[:-max_backups]:
                 os.remove(old_file)
@@ -85,7 +154,7 @@ def cleanup_old_backups(max_backups=10):
 def restore_from_backup(backup_file):
     """Restore data from a backup file"""
     try:
-        df = pd.read_json(backup_file)
+        df = pd.read_csv(backup_file)
         df['Date'] = pd.to_datetime(df['Date'])
         return df
     except Exception as e:
@@ -96,60 +165,33 @@ def get_available_backups():
     """Get list of available backup files"""
     ensure_backup_dir()
     try:
-        return sorted(Path(BACKUP_DIR).glob("backup_*.json"), reverse=True)
+        return sorted(Path(BACKUP_DIR).glob("backup_*.csv"), reverse=True)
     except:
         return []
 
 def initialize_data():
-    """Initialize or load existing data with recovery mechanism"""
-    # Try to load from PostgreSQL first
-    if DB_AVAILABLE:
+    """Initialize or load existing data from GitHub CSV"""
+    config = get_github_config()
+
+    if config:
         try:
-            db_manager = get_db_manager()
-
-            # Test connection and create tables if needed
-            if db_manager.test_connection():
-                db_manager.create_tables()
-                df = db_manager.load_dataframe_from_db()
-
-                # If database has data, use it
-                if not df.empty:
-                    # Sync to CSV backup
-                    save_data_to_csv(df)
-                    return df
+            df = load_csv_from_github(config, CSV_FILE)
+            if df is not None:
+                df['Date'] = pd.to_datetime(df['Date'])
+                return df
         except Exception as e:
-            st.warning(f"Database not available: {e}. Falling back to file storage.")
+            st.warning(f"Could not load from GitHub: {e}")
 
-    # Fallback to file-based storage
-    if os.path.exists(DATA_FILE):
-        try:
-            df = pd.read_json(DATA_FILE)
-            df['Date'] = pd.to_datetime(df['Date'])
-            # Also ensure CSV is up to date on load
-            save_data_to_csv(df)
-            return df
-        except Exception as e:
-            st.error(f"Error loading main data file: {e}")
-            # Try to recover from backup
-            st.info("Attempting to recover from backup...")
-            backups = get_available_backups()
-            if backups:
-                df = restore_from_backup(str(backups[0]))
-                if df is not None:
-                    st.success(f"✅ Recovered from backup: {backups[0].name}")
-                    return df
-            return create_empty_dataframe()
-    elif os.path.exists(CSV_FILE):
-        # If JSON doesn't exist but CSV does, load from CSV
+    # Fallback to local file if GitHub fails
+    if os.path.exists(CSV_FILE):
         try:
             df = pd.read_csv(CSV_FILE)
             df['Date'] = pd.to_datetime(df['Date'])
             return df
         except Exception as e:
-            st.error(f"Error loading CSV file: {e}")
-            return create_empty_dataframe()
-    else:
-        return create_empty_dataframe()
+            st.error(f"Error loading local CSV file: {e}")
+
+    return create_empty_dataframe()
 
 def save_data_to_csv(df):
     """Save dataframe to CSV only (helper function)"""
@@ -173,48 +215,44 @@ def create_empty_dataframe():
     ])
 
 def load_user_goals():
-    """Load user goals from database or file"""
-    # Try database first
-    if DB_AVAILABLE:
-        try:
-            db_manager = get_db_manager()
-            goals_df = db_manager.load_user_goals_from_db()
-            if not goals_df.empty:
-                return goals_df
-        except Exception as e:
-            st.warning(f"Could not load goals from database: {e}. Using file storage.")
+    """Load user goals from GitHub CSV file"""
+    config = get_github_config()
+    empty_df = pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)',
+                                     'Target Body Fat %', 'Target Weight (kg)', 'Weeks'])
 
-    # Fallback to file
-    goals_file = 'user_goals.csv'
-    if os.path.exists(goals_file):
+    if config:
         try:
-            return pd.read_csv(goals_file)
+            df = load_csv_from_github(config, GOALS_FILE)
+            if df is not None:
+                return df
+        except Exception as e:
+            st.warning(f"Could not load goals from GitHub: {e}")
+
+    # Fallback to local file
+    if os.path.exists(GOALS_FILE):
+        try:
+            return pd.read_csv(GOALS_FILE)
         except Exception as e:
             st.warning(f"Error loading goals: {e}")
-            return pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)',
-                                        'Target Body Fat %', 'Target Weight (kg)', 'Weeks'])
-    return pd.DataFrame(columns=['User', 'Target Fat Mass (kg)', 'Target Muscle Mass (kg)',
-                                 'Target Body Fat %', 'Target Weight (kg)', 'Weeks'])
+
+    return empty_df
 
 def save_user_goals(goals_df):
-    """Save user goals to database and file with backup"""
-    try:
-        # Save to database first
-        if DB_AVAILABLE:
-            try:
-                db_manager = get_db_manager()
-                db_manager.save_user_goals_to_db(goals_df)
-            except Exception as e:
-                st.warning(f"Could not save goals to database: {e}. Saving to file only.")
+    """Save user goals to GitHub CSV file"""
+    config = get_github_config()
 
-        # Save to file (backup)
-        goals_file = 'user_goals.csv'
-        if os.path.exists(goals_file):
-            create_backup(goals_file)
-        goals_df.to_csv(goals_file, index=False)
-        return True
-    except Exception as e:
-        st.error(f"Error saving goals: {e}")
+    if config:
+        try:
+            if save_csv_to_github(config, GOALS_FILE, goals_df, "Update user goals"):
+                return True
+            else:
+                st.error("Failed to save goals to GitHub")
+                return False
+        except Exception as e:
+            st.error(f"Error saving goals to GitHub: {e}")
+            return False
+    else:
+        st.error("GitHub not configured - cannot save goals")
         return False
 
 def get_user_goals(user):
@@ -225,34 +263,22 @@ def get_user_goals(user):
     return None
 
 def save_data(df):
-    """Save dataframe to PostgreSQL, JSON and CSV with automatic backup"""
-    try:
-        # Create backup before saving
-        create_backup()
+    """Save dataframe to GitHub CSV"""
+    config = get_github_config()
 
-        # Save to PostgreSQL first (if available)
-        db_saved = False
-        if DB_AVAILABLE:
-            try:
-                db_manager = get_db_manager()
-                db_saved = db_manager.save_dataframe_to_db(df)
-                if db_saved:
-                    st.success("✅ Data saved to PostgreSQL database")
-            except Exception as e:
-                st.warning(f"Could not save to database: {e}. Saving to files only.")
-
-        # Save to JSON (existing format - for backup)
-        df.to_json(DATA_FILE, orient='records', date_format='iso')
-
-        # Save to CSV (for easy export and GitHub tracking)
-        df_csv = df.copy()
-        if 'Date' in df_csv.columns:
-            df_csv['Date'] = pd.to_datetime(df_csv['Date']).dt.strftime('%Y-%m-%d %H:%M:%S')
-        df_csv.to_csv(CSV_FILE, index=False)
-
-        return True
-    except Exception as e:
-        st.error(f"Error saving data: {e}")
+    if config:
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            if save_csv_to_github(config, CSV_FILE, df, f"Update fitness data - {timestamp}"):
+                return True
+            else:
+                st.error("Failed to save data to GitHub")
+                return False
+        except Exception as e:
+            st.error(f"Error saving data to GitHub: {e}")
+            return False
+    else:
+        st.error("GitHub not configured - cannot save data")
         return False
 
 def calculate_fat_mass(weight, body_fat_pct):
