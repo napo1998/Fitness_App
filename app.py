@@ -494,13 +494,15 @@ st.markdown('<div class="main-header">❄️ Winter Arc Challenge 2025</div>', u
 # Sidebar
 with st.sidebar:
     st.header("👤 User Settings")
-    
+
     # User selection/creation
-    existing_users = st.session_state.data['User'].unique().tolist() if not st.session_state.data.empty else []
-    
+    existing_users = []
+    if not st.session_state.data.empty and 'User' in st.session_state.data.columns:
+        existing_users = [u for u in st.session_state.data['User'].dropna().unique().tolist() if u]
+
     user_option = st.radio("Select option:", ["Existing User", "New User"])
-    
-    if user_option == "Existing User" and existing_users:
+
+    if user_option == "Existing User" and len(existing_users) > 0:
         current_user = st.selectbox("Select User", existing_users)
     else:
         new_username = st.text_input("Enter Username", value="")
